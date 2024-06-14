@@ -1,0 +1,11 @@
+ipykernel
+torch
+matplotlib
+numpy
+tqdm
+pandas
+nltk
+spacy
+dask[complete]
+tokenizers
+datasets
