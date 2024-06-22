@@ -1,0 +1,20 @@
+version: '3.8'
+
+services:
+  jupyter-cuda:
+    name: jupyter-cuda
+    image: jupyter-cuda
+    build:
+      context: .
+      dockerfile: Dockerfile
+    ports:
+      - "8888:8888"
+    volumes:
+      - .:/workspace
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]
