@@ -6,6 +6,6 @@ tqdm
 pandas
 nltk
 spacy
-dask[complete]
-tokenizers
-datasets
+
+aiofiles
+nltk
