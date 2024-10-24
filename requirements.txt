@@ -6,6 +6,6 @@ tqdm
 pandas
 nltk
 spacy
-
+ray[tune]
 aiofiles
 nltk
