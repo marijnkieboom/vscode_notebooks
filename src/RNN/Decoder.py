@@ -27,7 +27,7 @@ class Decoder(nn.Module):
             hidden_size,
             num_layers,
             batch_first=True,
-            # dropout=dropout,
+            dropout=dropout,
         )
 
         self.fc = nn.Linear(hidden_size, vocab_size)
@@ -36,45 +36,44 @@ class Decoder(nn.Module):
 
     def forward(self, input, hidden, encodings):
         """
-        The forward function of the Decoder is called for every new token.
-        The Decoder RNN only steps a single time frame forwards. The step
-        is made simultaneously for all batches.
+        Args:
+            input: [batch_size] - Token indices for the current time step.
+            hidden: [num_layers, batch_size, hidden_size] - Hidden states from the previous time step.
+            encodings: [batch_size, seq_len, 2 * hidden_size] - Encoder outputs (used for attention).
+
+        Returns:
+            prediction: [batch_size, vocab_size] - Predicted next token distribution.
+            hidden: [num_layers, batch_size, hidden_size] - Updated hidden state for the next time step.
+            att_weights: [batch_size, seq_len] - Attention weights for the encoder outputs.
         """
 
-        # input     = [N]
-        # hidden    = [num layers, N, hidden size]
-        # encodings = [N, L, 2 * hidden size]
+        # Get learnable multi-dimensional embeddings of the input token
+        embeddings = self.dropout(self.embeddings(input)) # embeddings = [batch_size, embedding_dim]
 
-        """Get learnable multi-dimensional embeddings of the input"""
-        embeddings = self.dropout(self.embeddings(input))
-        # embeddings = [N, embedding dim]
-
-        """ Recompute context vector every time step, using the hidden state
-        of the previous time step, and the encoder outputs """
+        # Compute context vector using the current hidden state (query) and encoder outputs (values)
         context_vector, att_weights = self.attention(hidden, encodings)
-        # context_vector = [N, hidden size * 2]
-        # att_weights    = [N, L]
+        # context_vector = [batch_size, hidden size * 2]
+        # att_weights    = [batch_size, seq_len]
 
-        """ Input for the RNN is a combination of the embeddings of the last
-            generated token, and weighted encodings """
+        # Prepare input for the RNN by concatenating embeddings and context vector
         rnn_input = torch.cat((embeddings, context_vector), dim=1)
-        # rnn_input = [N, embedding dim + 2 * hidden size]
+        # rnn_input = [batch_size, embedding dim + 2 * hidden size]
 
-        """ Add a single sequence length dimension to the RNN input"""
+        # Add a sequence length dimension (since the RNN expects [batch_size, seq_len, input_size])
         rnn_input = rnn_input.unsqueeze(1)
-        # rnn_input = [N, 1, embedding dim + 2 * hidden size]
+        # rnn_input = [batch_size, 1, embedding dim + 2 * hidden size]
 
-        """ Iterate only one step """
+        # Run the RNN for a single time step
         output, hidden = self.rnn(rnn_input, hidden)
-        # output = [N, 1, hidden size]
-        # hidden = [num layers, N, hidden size]
+        # output = [batch_size, 1, hidden size]
+        # hidden = [num layers, batch_size, hidden size]
 
-        """ Remove the single sequence length dimension again """
+        # Remove the sequence length dimension
         output = output.squeeze(1)
-        # output = [N, hidden size]
+        # output = [batch_size, hidden size]
 
-        """ Make a prediction for the next token based on the output """
+        # Generate predictions for the next token
         prediction = self.fc(output)
-        # prediction = [N, vocab size]
+        # prediction = [batch_size, vocab size]
 
         return prediction, hidden, att_weights

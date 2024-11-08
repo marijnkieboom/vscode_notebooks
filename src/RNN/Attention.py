@@ -12,8 +12,8 @@ class Attention(nn.Module):
     def __init__(self, num_layers: int, hidden_size: int):
         super().__init__()
 
-        self.W1 = nn.Linear(num_layers * hidden_size, hidden_size)
-        self.W2 = nn.Linear(2 * hidden_size, hidden_size)
+        self.W1 = nn.Linear(num_layers * hidden_size, hidden_size, bias=False)
+        self.W2 = nn.Linear(2 * hidden_size, hidden_size, bias=False)
         self.V = nn.Linear(hidden_size, 1, bias=False)
 
     def forward(self, hidden, encodings):
@@ -23,41 +23,26 @@ class Attention(nn.Module):
         time step, but the values remain the same for every step.
         """
 
-        # hidden    = [num layers, N, hidden size]
-        # encodings = [N, L, 2 * hidden size]
+        # hidden: [num_layers, batch_size, hidden_size]
+        # encodings: [batch_size, seq_len, 2 * hidden_size]
 
-        hidden = torch.movedim(hidden, 0, 1)
-        # hidden = [N, num layers, hidden size]
-
-        batch_size = hidden.shape[0]  # N
-        num_layers = hidden.shape[1]
+        batch_size = hidden.shape[1]
+        num_layers = hidden.shape[0]
         hidden_size = hidden.shape[2]
 
-        concat_hidden = hidden.reshape(batch_size, num_layers * hidden_size)
-        # concat_hidden = [N, num layers * hidden size]
+        # Concatenate hidden states of all layers
+        hidden = hidden.transpose(0, 1).contiguous().view(batch_size, -1)  # [batch_size, num_layers * hidden_size]
 
-        """ Add a dimension to match the encodings """
-        concat_hidden = concat_hidden.unsqueeze(1)
-        # concat_hidden = [N, 1, num layers * hidden size]
+        # Expand hidden state for broadcasting
+        hidden_exp = self.W1(hidden).unsqueeze(1)  # [batch_size, 1, hidden_size]
 
-        """ Calculate scores """
-        scores = self.V(torch.tanh(self.W1(concat_hidden) + self.W2(encodings)))
-        # scores = [N, L, 1]
+        # Calculate attention scores
+        scores = self.V(torch.tanh(hidden_exp + self.W2(encodings)))  # [batch_size, seq_len, 1]
 
-        scores = torch.movedim(scores, 1, 2)
-        # scores = [N, 1, L]
+        # Rescale to [0, 1] and sum to 1
+        attention_weights = F.softmax(scores.squeeze(-1), dim=-1)  # [batch_size, seq_len]
 
-        """ Rescale so that the scores lie in the range of [0-1] and sum to 1 """
-        attention_weights = F.softmax(scores, dim=-1)
-        # attention_weights = [N, 1, L]
+        # Calculate context vector as the weighted sum of encodings
+        context_vector = torch.bmm(attention_weights.unsqueeze(1), encodings)  # [batch_size, 1, 2 * hidden_size]
 
-        """ Calculate the context vector """
-        context_vector = torch.bmm(attention_weights, encodings)
-        # context_vector = [N, 1, 2 * hidden size]
-
-        context_vector = context_vector.squeeze(1)
-        attention_weights = attention_weights.squeeze(1)
-        # context_vector = [N, 2 * hidden size]
-        # attention_weights = [N, L]
-
-        return context_vector, attention_weights
+        return context_vector.squeeze(1), attention_weights

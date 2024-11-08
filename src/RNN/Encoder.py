@@ -24,7 +24,7 @@ class Encoder(nn.Module):
             hidden_size,
             num_layers,
             batch_first=True,
-            # dropout=dropout,
+            dropout=dropout,
             bidirectional=True,
         )
 
@@ -32,32 +32,34 @@ class Encoder(nn.Module):
 
     def forward(self, input):
         """
+        Args:
+            input: [batch_size, seq_len] - Input sequence of token indices
+
+        Returns:
+            output: [batch_size, seq_len, 2 * hidden_size] - Encodings of the whole input
+            hidden: [num_layers, batch_size, 2 * hidden_size] - Final hidden states of the encoder, which can be used to initialize the decoder hidden states
+
         The forward function of the Encoder is called once for the entire
         input sequence. The RNN steps as many times as the lenght of the
         sequence. This is done simultaneously for all batches.
         """
 
-        # input = [N, L]
+        batch_size = input.shape[0]  # batch_size
 
-        batch_size = input.shape[0]  # N
+        # Get learnable multi-dimensional embeddings of the input matrix
+        embeddings = self.dropout(self.embeddings(input)) # embeddings = [batch_size, seq_len, embedding_dim]
 
-        """ Get learnable multi-dimensional embeddings of the input matrix """
-        embeddings = self.dropout(self.embeddings(input))
-        # embeddings = [N, L, embedding dim]
-
-        """ Run the embeddings through an RNN, iterating over the `sequence length` dimension """
+        # Run the embeddings through the bidirectional RNN
         output, hidden = self.rnn(embeddings)
-        # output = [N, L, 2 * hidden size]
-        # hidden = [2 * num layers, N, hidden size]
+        # output = [batch_size, seq_len, 2 * hidden_size]
+        # hidden = [2 * num_layers, batch_size, hidden_size]
 
-        """  Concat hidden states of forward and backward passes to obtain the annotations """
-        hidden = hidden.view(self.num_layers, 2, batch_size, self.hidden_size)
-        # [num layers, 2, N, hidden size]
+        # Concat hidden states from forward and backward passes to obtain the annotations """
+        hidden = hidden.reshape(self.num_layers, 2, batch_size, self.hidden_size)
+        # hidden = [num_layers, 2, batch_size, hidden_size]
+
+        # Concatenate forward and backward hidden states
         hidden = torch.cat((hidden[:, 0, :, :], hidden[:, 1, :, :]), dim=2)
-        # [num layers, N, 2 * hidden size]
+        # hidden = [num_layers, batch_size, 2 * hidden_size]
 
-        """
-         * Encoder outputs: Sequence of (the sum of) hidden states from the encoder for each time step.
-         * Hidden state:    The last hidden state from the encoder, which can be used to initialize the decoder's hidden state.
-        """
         return output, hidden
