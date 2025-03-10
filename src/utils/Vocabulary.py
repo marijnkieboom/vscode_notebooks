@@ -1,70 +1,27 @@
-MIN_count = 4
-
-PAD_token = 0
-SOS_token = 1
-EOS_token = 2
-UNK_token = 3
-
+from collections import OrderedDict
 
 class Vocabulary:
+    def __init__(self, ordered_dict: OrderedDict, min_freq):
+        self.min_freq = min_freq
+        self.specials = ['<PAD>', '<SOS>', '<EOS>', '<UNK>']
 
-    def __init__(self, name):
-        self.name = name
-        self.word2index = {}
-        self.word2count = {}
-        self.index2word = {}
-        self.num_words = 0
+        filtered_dict = {token: freq for token, freq in ordered_dict.items() if freq >= self.min_freq}
 
-        [self.add_word(word) for word in ["<PAD>", "<SOS>", "<EOS>", "<UNK>"]]
+        self.token_to_index = {token: idx for idx, token in enumerate(self.specials)}
+        self.token_to_index.update({token: idx + len(self.specials) for idx, token in enumerate(filtered_dict.keys())})
 
-    def add_word(self, word: str):
-        if word not in self.word2index:
-            ix = self.num_words
+        self.index_to_token = {idx: token for token, idx in self.token_to_index.items()}
 
-            self.word2index[word] = ix
-            self.index2word[ix] = word
-            self.word2count[word] = 1
+        self.size = len(self.token_to_index)
 
-            self.num_words += 1
-        else:
-            self.word2count[word] += 1
+    def token_to_index_func(self, token):
+        return self.token_to_index.get(token.lower(), self.token_to_index['<UNK>'])
 
-    def add_sentence(self, sentence):
-        for word in sentence.split():
-            self.add_word(word)
-
-    def trim(self):
-        keep_words = []
-
-        for k, v in self.word2count.items():
-            if v >= MIN_count:
-                keep_words.append(k)
-
-        # Reinitialize dictionaries
-        self.word2index = {}
-        self.word2count = {}
-        self.index2word = {}
-        self.num_words = 0
-
-        [self.add_word(word) for word in ["<PAD>", "<SOS>", "<EOS>", "<UNK>"]]
-
-        for word in keep_words:
-            self.add_word(word)
-
-    def to_word(self, index: int) -> str:
-        return self.index2word[index]
-
-    def to_index(self, word: str) -> int:
-        if word in self.word2index:
-            return self.word2index[word]
-        else:
-            return UNK_token
-
-    def lookup_indices(self, tokens: list) -> list:
-        return [self.to_index(token) for token in tokens]
-
-    def lookup_tokens(self, indices: list) -> list:
-        return [self.to_word(index) for index in indices]
+    def index_to_token_func(self, index):
+        return self.index_to_token.get(index, None)
 
     def __len__(self):
-        return self.num_words
+        return self.size
+
+    def __str__(self):
+        return f"Vocabulary with {self.size} tokens."

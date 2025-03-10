@@ -11,12 +11,11 @@ FORBIDDEN_CHARS = ['"']
 
 
 async def tokenize_sentence(sentence: str) -> list:
-    """Tokenize a single sentence."""
+    ''' Tokenize a single sentence '''
     return ["<SOS>"] + word_tokenize(sentence) + ["<EOS>"]
 
 
 async def process_line(line: str):
-    """Process a single line from the TSV file."""
     columns = line.strip().split("\t")
     eng_sentence = columns[1]
     nld_sentence = columns[3]
@@ -31,7 +30,6 @@ async def process_line(line: str):
 
 
 async def process_file(input_file: str, output_file: str):
-    """Read TSV file asynchronously, tokenize and write results to CSV."""
     async with aiofiles.open(input_file, mode="r", encoding="utf-8") as tsv_file:
         reader = await tsv_file.readlines()
 

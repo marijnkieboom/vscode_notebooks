@@ -1,4 +1,5 @@
-models/
-venv/
 .venv/
+.vscode/
+models/
+data-sets/
 __pycache__

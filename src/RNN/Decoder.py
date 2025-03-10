@@ -23,7 +23,7 @@ class Decoder(nn.Module):
         self.embeddings = nn.Embedding(vocab_size, emb_dim)
         self.attention = Attention(num_layers, hidden_size)
 
-        self.input_fc = nn.Linear( emb_dim + hidden_size * 2, hidden_size)
+        self.input_fc = nn.Linear(emb_dim + hidden_size * 2, hidden_size)
 
         self.rnn = nn.GRU(
             hidden_size,
@@ -49,7 +49,6 @@ class Decoder(nn.Module):
             hidden: [num_layers, batch_size, hidden_size] - Updated hidden state for the next time step.
             att_weights: [batch_size, seq_len] - Attention weights for the encoder outputs.
         """
-
         # Get learnable multi-dimensional embeddings of the input token
         embeddings = self.dropout(self.embeddings(input)) # embeddings: [batch_size, embedding_dim]
 

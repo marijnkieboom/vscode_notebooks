@@ -3,7 +3,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
-from RNN.Encoder import Encoder
+from RNN.Encoder import Encoder as Bidirection_Encoder
 from RNN.Decoder import Decoder
 
 
@@ -21,8 +21,8 @@ class Seq2Seq(nn.Module):
     ):
         super().__init__()
 
-        """Construct the encoder"""
-        self.encoder = Encoder(
+        """ Construct a Bidirectional encoder """
+        self.encoder = Bidirection_Encoder(
             input_vocab_size,
             emb_dim,
             encoder_hidden_size,
@@ -30,7 +30,7 @@ class Seq2Seq(nn.Module):
             dropout,
         )
 
-        """Construct the decoder"""
+        """ Construct the decoder """
         self.decoder = Decoder(
             output_vocab_size,
             emb_dim,
@@ -39,28 +39,28 @@ class Seq2Seq(nn.Module):
             dropout,
         )
 
-        """Transform encoder's final hidden state to initialize the decoder's hidden state"""
+        """ Construct a Linear Layer (also known as a fully connected layer) to map data into a lower-
+        dimensional space. The encoder's final hidden state will be transformed into the initial hidden
+        state of the decoder. """
         self.fc_hidden = nn.Linear(encoder_hidden_size * 2, decoder_hidden_size)
 
     def forward(self, source, target, forced_teaching_ratio=0):
         batch_size = source.shape[0]
         sequence_length = source.shape[1]
-        target_vocab_size = self.decoder.vocab_size
-        device = next(self.parameters()).device
 
-        # Encode the source sequence
-        encodings, hidden = self.encoder(source)
+        encodings, hidden = self.encoder(source) # Encode the input whole
         hidden = torch.tanh(self.fc_hidden(hidden))
 
-        input = source[:, 0] # Primer is an <SOS> token
+        input = torch.zeros(batch_size, dtype=torch.long).to(source.device)
+        input[:] = 1 # Primer for the decoder is an <SOS> token (ix = 1)
         outputs = []
 
-        # Iterate over the target sequence
+        # Run the decoder 1 step at at time
         for i in range(sequence_length):
             output, hidden, _ = self.decoder(input, hidden, encodings)
             outputs.append(output.unsqueeze(0))
 
-            use_teacher_forcing = torch.bernoulli(torch.tensor(forced_teaching_ratio, dtype=torch.float)).item()
+            use_teacher_forcing = torch.rand(1).item() < forced_teaching_ratio
             if use_teacher_forcing:
                 input = target[:, i] # Ground truth token
             else:
@@ -74,13 +74,12 @@ class Seq2Seq(nn.Module):
         self.eval()
 
         input = torch.tensor(ixs, device=device).unsqueeze(0) # tensor: [1, seq_len]
-        encodings, hidden = self.encoder(input)
-        # encodings: [1, seq_len, 2 * hidden_size]
-        # hidden: [num_layers, 1, 2 * hidden_size]
 
+        encodings, hidden = self.encoder(input)
         hidden = torch.tanh(self.fc_hidden(hidden)) # Create decoder hidden state
 
         input = torch.tensor([1], device=device) # Primer is an <SOS> tokens
+
         output_ixs = []
         attentions = []
 
@@ -88,13 +87,13 @@ class Seq2Seq(nn.Module):
             output, hidden, attention = self.decoder(input, hidden, encodings)
             attentions.append(attention)
 
-            predicted_token_ix = torch.argmax(output).item()
+            predicted_token_ix = torch.argmax(output, dim=1).item()
             output_ixs.append(predicted_token_ix)
 
             input = torch.tensor([predicted_token_ix], device=device)
 
             # Stop generating when End Of Sequence token is generated
-            if input.item() == 2: # <EOS>
+            if predicted_token_ix == 2: # <EOS>
                 break
 
         # Concatenate along the time dimension
