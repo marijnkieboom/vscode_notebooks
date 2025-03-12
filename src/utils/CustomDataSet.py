@@ -3,7 +3,7 @@ import pandas as pd
 from torch.utils.data import Dataset
 
 class CustomDataSet(Dataset):
-    def __init__(self, file_path, output_size, input_vocab, target_vocab):
+    def __init__(self, file_path, output_size, input_vocab, target_vocab, nrows):
         self.data = []
         self.output_size = output_size
         self.input_vocab = input_vocab
@@ -20,7 +20,7 @@ class CustomDataSet(Dataset):
             header=None,
             names=columns,
             dtype=dtype,
-            nrows=5000000
+            nrows=nrows
         ):
             self.data.extend(self.process_chunk(chunk))
 
