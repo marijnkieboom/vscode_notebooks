@@ -1,14 +1,8 @@
 ipykernel
-ipywidgets
-jupyter
-torch
-matplotlib
-numpy
-tqdm
+nltk
 pandas
-nltk
-spacy
-ray[tune]
-aiofiles
-nltk
-dask[complete]
+pyarrow
+matplotlib
+
+--extra-index-url https://download.pytorch.org/whl/cu130
+torch==2.9.0+cu130
